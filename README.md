@@ -1,88 +1,163 @@
-# Swift Starter App Boilerplate
+# StayOn
 
 <p align="center">
-  <img src="Resources/AppIcon.png" width="128" height="128" alt="App Icon" />
+  <img src="Resources/AppIcon.png" width="128" height="128" alt="StayOn App Icon" />
 </p>
 
-A minimal, zero-dependency macOS starter boilerplate written in native Swift and AppKit. Designed to be stripped clean, quickly configured, and used as the foundation for building lightweight menu bar (status bar) or desktop macOS applications.
+<p align="center">
+  <a href="https://github.com/unamatasanatarai/stayon/releases/latest">
+    <img src="https://img.shields.io/badge/Download-Latest_Release-007AFF?style=for-the-badge&logo=apple&logoColor=white" alt="Download Latest Release" />
+  </a>
+</p>
+
+<p align="center">
+  <strong>Keep your Mac awake when it matters most — with a single click from the menu bar.</strong>
+</p>
+
+<p align="center">
+  <a href="https://swift.org"><img src="https://img.shields.io/badge/Swift-5.7+-FA7343?logo=swift&logoColor=white" alt="Swift" /></a>
+  <a href="https://www.apple.com/macos/"><img src="https://img.shields.io/badge/macOS-12.0+-000000?logo=apple&logoColor=white" alt="macOS 12+" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--2.0-blue.svg" alt="License: GPL-2.0" /></a>
+  <img src="https://img.shields.io/badge/Dependencies-Zero-success" alt="Zero Dependencies" />
+</p>
+
+StayOn is a lightweight, native macOS menu bar utility that prevents system idle sleep indefinitely or for a precision duration. Built exclusively for the menu bar with zero Dock clutter, zero windows, and zero background overhead, it lets you maintain uninterrupted workflows during presentations, large file transfers, renders, and compile jobs without changing your system-wide energy settings.
+
+---
+
+## Why StayOn
+
+macOS sleep timers protect your battery and display, but they often kick in at the worst possible moments: halfway through a screen share, during an overnight dataset download, or in the middle of a lengthy build. Adjusting Energy Saver settings in System Settings requires digging through menus and invariably leads to forgetting to turn sleep back on.
+
+StayOn solves this with a lightweight, temporary override right in your menu bar:
+
+* **Instant Control**: Left-click to immediately activate indefinite sleep prevention; left-click again to release it.
+* **Fire-and-Forget Timers**: Right-click to pick a duration from 5 minutes to 4 hours. StayOn keeps your system awake and automatically returns macOS to normal sleep management the moment the timer elapses.
+* **Native System Assertions**: Uses Apple's official `ProcessInfo` activity assertions rather than generating synthetic keystrokes or mouse wiggles. Your screen can still turn off safely, and no lingering locks remain if the app closes.
+
+---
+
+## Key Capabilities
+
+### Instant One-Click Toggle
+Left-click the status bar icon to toggle indefinite sleep prevention immediately. The icon instantly transitions between an active heartbeat pulse and an inactive flatline.
+
+### Eight Predefined Timers
+Choose from standard durations tailored to real workflows:
+* **Short Tasks**: 5, 10, 15 minutes
+* **Standard Sessions**: 30, 45 minutes
+* **Extended Operations**: 1, 2, 4 hours
+
+Selecting a new duration resets the countdown immediately without compounding or competing with existing timers.
+
+### Real-Time Expiration Tracking
+The top menu item calculates remaining time directly against an absolute deadline timestamp. It provides continuous live feedback (`Active — 23 minutes left` down to `Active — Less than 1 minute left`) and acts as a quick deactivation button with a single click.
+
+### Adaptive Menu Bar States
+Custom vector-rendered status bar icons seamlessly adapt to both Light Mode and Dark Mode:
+* **Active**: Rounded rectangle with an energized pulse waveform (`pulse-on`).
+* **Inactive**: Rounded rectangle with a calm flatline (`pulse-off`).
+* **Theme-Aware**: Renders a high-contrast dark badge with white line in Light Mode, and a crisp light badge with dark line in Dark Mode.
+
+### Persistent Launch & Login Controls
+Includes native, visible checkbox toggles for your environment:
+* **Start at Login**: Registers StayOn to start when your Mac boots (using `SMAppService` on macOS 13+ and `SMLoginItemSetEnabled` on macOS 12).
+* **Activate on Launch**: Automatically enables indefinite sleep prevention every time the app opens.
+
+---
+
+## How It Works
+
+```text
+  [ Left-Click ] ──────────────► Toggle Indefinite Awake State
+                                 (Immediate Assertion / Release)
+
+  [ Right-Click ] ─────────────► Native Context Menu
+                                  ├── Dynamic Status & One-Click Deactivation
+                                  ├── 8 Precision Timers (5m – 4h)
+                                  ├── ☑ Start at Login
+                                  ├── ☑ Activate on Launch
+                                  └── Quit StayOn
+```
+
+1. **Activate**: Left-click the menu bar icon for indefinite mode, or right-click and pick a duration.
+2. **Assertion Held**: StayOn holds a single, unified `ProcessInfo.idleSystemSleepDisabled` assertion with the operating system.
+3. **Auto-Expiration**: When a timer concludes, StayOn automatically releases the assertion and returns the icon to inactive with zero user intervention required.
+
+---
+
+## What Makes It Different
+
+* **True Menu Bar Citizen (`LSUIElement = true`)**: No Dock icon, no command center window, and no application switcher footprint.
+* **Display Sleep Preserved**: Unlike crude caffeinate wrappers, StayOn prevents idle system sleep without forcing your display to remain at full brightness unless your system settings explicitly mandate it.
+* **Deterministic Assertion Lifecycle**: Exactly one system assertion is held at any time. Switching between indefinite and timed modes reuses the active assertion without churn, and deactivation, expiration, or quitting releases it instantly.
+* **Zero Dependencies**: Pure Swift and AppKit. No Electron, no Node runtime, no external package dependencies.
+
+---
 
 ## Quick Start
 
+### Build and Launch
+
+Compile the standalone `.app` bundle and run it immediately:
+
 ```bash
-# Build the application bundle
-make build
-
-# Launch the application
 make run
-
-# Terminate running instances
-make kill
-
-# Run the test suite
-make test
-
-# Build the release DMG
-make dmg
-
-# Reset permissions and macOS caches
-make revoke
-
-# Clean build artifacts
-make clean
 ```
 
-## Makefile Targets
+### Build Distribution DMG
+
+Package the app into a drag-and-drop macOS disk image with custom background styling:
+
+```bash
+make dmg
+```
+
+The resulting distribution disk image is saved to `build/StayOn-1.0.0.dmg`.
+
+---
+
+## Development & Makefile Targets
+
+StayOn includes a zero-dependency build system using standard macOS developer tools:
 
 | Target | Description |
 |---|---|
-| `make help` | Display available targets and descriptions |
-| `make build` | Compile the `.app` bundle into `build/` |
-| `make run` | Terminate existing instances, rebuild, and launch the app |
-| `make kill` | Terminate running instances of the application |
-| `make test` | Run the native Swift test suite |
-| `make dmg` | Build a styled DMG package for distribution |
-| `make release <version>` | Bump version, execute tests, build DMG, tag, and publish |
-| `make revoke` | Reset TCC permissions and flush macOS QuickLook & LaunchServices caches |
-| `make clean` | Remove `build/` artifacts and temporary test binaries |
+| `make build` | Compile the `.app` bundle into `build/StayOn.app` with ad-hoc code signing |
+| `make run` | Terminate running instances, rebuild bundle, and launch `StayOn.app` |
+| `make test` | Compile and execute the native Swift unit test suite |
+| `make dmg` | Create styled, distribution-ready disk image (`build/StayOn-<version>.dmg`) |
+| `make kill` | Terminate all running `StayOn` processes cleanly |
+| `make revoke` | Reset permissions and flush macOS LaunchServices and QuickLook caches |
+| `make clean` | Remove `build/` directory and temporary artifacts |
 
-## Project Structure
+---
 
-```text
-swift-boilerplate/
-├── Makefile                # Build orchestration and lifecycle targets
-├── Package.swift           # Swift Package Manager manifest
-├── VERSION                 # Current semantic version
-├── BUILD_NUMBER            # Auto-incrementing build counter
-├── Resources/
-│   ├── AppIcon.icns        # Application icon (macOS icns)
-│   ├── AppIcon.png         # Generic black square with white "sa"
-│   ├── StatusBarIcon.png   # 18x18 status bar icon ("sa")
-│   ├── StatusBarIcon@2x.png# 36x36 retina status bar icon ("sa")
-│   └── dmg_background*.png # DMG distribution styling
-├── Sources/
-│   └── App/
-│       ├── Main.swift                # Application entry point (@main)
-│       ├── AppDelegate.swift         # NSApplicationDelegate lifecycle
-│       ├── AppConfig.swift           # App metadata and version resolution
-│       └── StatusBarController.swift # Menu bar status item & menu
-├── Tests/
-│   └── AppTests/
-│       ├── AppTests.swift  # Minimal test suite
-│       └── TestMain.swift  # Test runner entry point
-└── scripts/
-    ├── config.sh           # App name, bundle ID, and build settings
-    ├── build.sh            # Direct swiftc compilation & code signing
-    ├── test.sh             # Native test compilation & execution
-    ├── build_dmg.sh        # DMG packaging script
-    └── release.sh          # Version bump & automated release workflow
-```
+## Testing & Quality
 
-## Customizing
-
-Edit [scripts/config.sh](file:///Users/citizen/dev/swift-boilerplate/scripts/config.sh) to set your app name and bundle identifier:
+StayOn includes a native, standalone Swift test suite that executes directly via `make test` without requiring Xcode GUI test harnesses:
 
 ```bash
-export APP_NAME="MyApp"
-export BUNDLE_ID="com.example.MyApp"
-export LS_UI_ELEMENT="true" # Set to false if you want a regular Dock icon
+make test
 ```
+
+The suite covers:
+* **State Machine Transitions**: Validates transitions across Inactive, Active Indefinite, and Active Timed states.
+* **Deadline Calculations**: Verifies remaining time calculations, rounding thresholds, and status text formatting across all boundary conditions.
+* **Assertion Management**: Confirms single-assertion guarantees, reuse across duration switches, and complete release on timer expiration or quit.
+* **Preferences & Persistence**: Verifies `UserDefaults` persistence, login item registration workflows, and launch state synchronization.
+* **Menu Structure**: Validates exact menu item hierarchy, tags, separators, keyboard shortcuts, and visible checkbox states.
+
+---
+
+## Requirements
+
+* **Operating System**: macOS 12.0 (Monterey) or later
+* **Architecture**: Universal (Apple Silicon & Intel)
+* **Build Tooling**: Command Line Tools for Xcode (`swiftc`, `codesign`, `iconutil`)
+
+---
+
+## License
+
+This project is licensed under the [GNU General Public License v2.0](LICENSE).
