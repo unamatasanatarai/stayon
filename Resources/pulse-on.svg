@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="480" height="234"
+     viewBox="0 0 480 234">
+  <path
+    d="M 28,160
+       L 76,160
+       C 96,160 103,213 128,213
+       C 155,213 173,55 211,55
+       C 248,55 264,265 292,265
+       C 319,265 330,122 366,122
+       C 394,122 400,181 429,181
+       L 484,181"
+    transform="translate(-16 -43)"
+    fill="none"
+    stroke="#000"
+    stroke-width="24"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+</svg>
