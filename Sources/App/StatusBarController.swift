@@ -11,6 +11,7 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
     public private(set) var durationMenuItems: [NSMenuItem] = []
     public private(set) var startAtLoginMenuItem: NSMenuItem!
     public private(set) var activateOnLaunchMenuItem: NSMenuItem!
+    public private(set) var preventLogoutMenuItem: NSMenuItem!
     public private(set) var quitMenuItem: NSMenuItem!
 
     private var appearanceObservation: NSKeyValueObservation?
@@ -107,9 +108,20 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         activateOnLaunchMenuItem.offStateImage = StatusBarIcon.uncheckedCheckboxImage
         contextMenu.addItem(activateOnLaunchMenuItem)
 
+        // 5. Prevent Logout
+        preventLogoutMenuItem = NSMenuItem(
+            title: "Prevent Logout",
+            action: #selector(togglePreventLogoutAction(_:)),
+            keyEquivalent: ""
+        )
+        preventLogoutMenuItem.target = self
+        preventLogoutMenuItem.onStateImage = StatusBarIcon.checkedCheckboxImage
+        preventLogoutMenuItem.offStateImage = StatusBarIcon.uncheckedCheckboxImage
+        contextMenu.addItem(preventLogoutMenuItem)
+
         contextMenu.addItem(NSMenuItem.separator())
 
-        // 5. Quit
+        // 6. Quit
         quitMenuItem = NSMenuItem(
             title: "Quit \(AppConfig.appName)",
             action: #selector(quitAction(_:)),
@@ -149,6 +161,7 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         refreshStatusMenuItem()
         startAtLoginMenuItem.state = model.isStartAtLoginEnabled ? .on : .off
         activateOnLaunchMenuItem.state = model.isActivateOnLaunchEnabled ? .on : .off
+        preventLogoutMenuItem.state = model.isPreventLogoutEnabled ? .on : .off
     }
 
     public func refreshStatusMenuItem() {
@@ -224,6 +237,12 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
     @objc private func toggleActivateOnLaunchAction(_ sender: NSMenuItem) {
         let willEnable = (sender.state != .on)
         model.setActivateOnLaunch(willEnable)
+        updateMenuContent()
+    }
+
+    @objc private func togglePreventLogoutAction(_ sender: NSMenuItem) {
+        let willEnable = (sender.state != .on)
+        model.setPreventLogout(willEnable)
         updateMenuContent()
     }
 

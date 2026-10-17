@@ -71,7 +71,7 @@ public final class StayOnModel {
 
     public func activateIndefinitely() {
         cancelExistingTimer()
-        assertionManager.acquireAssertion()
+        assertionManager.acquireAssertion(preventLogout: preferences.preventLogout)
         state = .activeIndefinite
     }
 
@@ -81,7 +81,7 @@ public final class StayOnModel {
 
     public func activateTimed(seconds: TimeInterval, from now: Date = Date()) {
         cancelExistingTimer()
-        assertionManager.acquireAssertion()
+        assertionManager.acquireAssertion(preventLogout: preferences.preventLogout)
 
         let deadline = now.addingTimeInterval(seconds)
         state = .activeTimed(deadline: deadline)
@@ -134,6 +134,17 @@ public final class StayOnModel {
 
     public func setActivateOnLaunch(_ enabled: Bool) {
         preferences.activateOnLaunch = enabled
+    }
+
+    public var isPreventLogoutEnabled: Bool {
+        return preferences.preventLogout
+    }
+
+    public func setPreventLogout(_ enabled: Bool) {
+        preferences.preventLogout = enabled
+        if state.isActive {
+            assertionManager.acquireAssertion(preventLogout: enabled)
+        }
     }
 
     public func handleQuit() {

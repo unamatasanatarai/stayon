@@ -24,5 +24,21 @@ public enum AppTests {
             assert(controller.currentMenu.items.count >= 2, "Menu should have items")
             assert(controller.currentMenu.items.contains { $0.title.contains("Quit") }, "Menu should contain quit item")
         }
+
+        testRunner("ProcessInfoSleepAssertionManager acquires and releases assertion correctly") {
+            let manager = ProcessInfoSleepAssertionManager()
+            assert(!manager.isAssertionActive, "Initial state should be inactive")
+            manager.acquireAssertion(preventLogout: true)
+            assert(manager.isAssertionActive, "Assertion should be active after acquire")
+            manager.acquireAssertion(preventLogout: false)
+            assert(manager.isAssertionActive, "Assertion should remain active after reconfiguration")
+            manager.acquireAssertion(preventLogout: false)
+            assert(manager.isAssertionActive, "Assertion should remain active on redundant acquire")
+            manager.releaseAssertion()
+            assert(!manager.isAssertionActive, "Assertion should be inactive after release")
+            manager.releaseAssertion()
+            assert(!manager.isAssertionActive, "Assertion should remain inactive on redundant release")
+        }
     }
 }
+

@@ -72,6 +72,8 @@ Start at Login
 
 Activate on Launch
 
+Prevent Logout
+
 Quit StayOn
 
 Illustrative menu layout. The checkmarks represent enabled toggle settings, not fixed defaults.
@@ -136,7 +138,15 @@ A persistent toggle that determines whether StayOn automatically enables sleep p
 
 Important: In v1.0, this setting always activates indefinitely. It does not restore a previous timer or its remaining duration.
 
-### 4.5 Quit
+### 4.5 Prevent Logout
+
+A persistent toggle that controls whether sleep prevention also prevents display sleep and automatic inactivity logouts.
+
+- Checked (default): Prevents idle display sleep and periodically declares user activity via native IOKit assertions (`IOPMAssertionDeclareUserActivity`), keeping the display awake and suppressing macOS inactivity logouts without needing Accessibility permissions (just like Caffeine).
+- Unchecked: Prevents system sleep only, allowing the display to sleep and allowing normal macOS idle timeout and automatic logout.
+- Toggling while active immediately reconfigures the active assertion without interrupting current timers.
+
+### 4.6 Quit
 
 Selecting Quit must:
 
@@ -190,20 +200,21 @@ The active icon is identical for indefinite and timed activation. The remaining 
 - Minimum OS: macOS 13 Ventura or later.
 - Preferences: `UserDefaults`.
 - Login item: `SMAppService`, available on the specified minimum OS.
-- Sleep prevention: `ProcessInfo.processInfo.beginActivity(options:reason:)` or another appropriate native system assertion, with correct lifecycle management.
+- Sleep prevention: `ProcessInfo.processInfo.beginActivity(options:reason:)` combined with native IOKit user activity declarations (`IOPMAssertionDeclareUserActivity`), with correct lifecycle management.
 
 ### Preventing sleep
 
-Use a system-supported assertion with the appropriate options to prevent system idle sleep while StayOn is active.
+Use system-supported assertions with the appropriate options to prevent system and display idle sleep and automatic inactivity logouts while StayOn is active.
 
 Implementation requirements:
 
 - Hold exactly one active assertion at a time.
 - Reuse the assertion when changing from indefinite to timed activation or replacing one timer with another.
-- Invalidate the assertion immediately on deactivation, timer expiration, or quit.
-- Do not generate artificial mouse or keyboard events.
-- Do not disable the display's ability to sleep unless explicitly required in a future version.
+- Invalidate the assertion and user activity declarations immediately on deactivation, timer expiration, or quit.
+- Do not generate artificial mouse or keyboard events (no Accessibility permissions required).
+- Prevent both idle system sleep and display sleep, while periodically declaring user activity via IOKit to prevent automatic logout and lock screen timers.
 - Do not attempt to prevent forced shutdown, battery depletion, or shutdown initiated by the user or operating system.
+
 
 The app prevents automatic idle sleep; it does not guarantee that the Mac can never shut down.
 
@@ -232,6 +243,7 @@ Persist these preferences:
 
 - `startAtLogin`: Boolean.
 - `activateOnLaunch`: Boolean.
+- `preventLogout`: Boolean (defaults to true).
 
 Do not persist active runtime state as a promise that sleep prevention remains enabled across launches.
 

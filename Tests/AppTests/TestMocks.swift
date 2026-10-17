@@ -4,10 +4,12 @@ public final class MockSleepAssertionManager: SleepAssertionManaging {
     public var acquireCount: Int = 0
     public var releaseCount: Int = 0
     public var isAssertionActive: Bool = false
+    public var lastPreventLogout: Bool?
 
     public init() {}
 
-    public func acquireAssertion() {
+    public func acquireAssertion(preventLogout: Bool = true) {
+        lastPreventLogout = preventLogout
         guard !isAssertionActive else { return }
         isAssertionActive = true
         acquireCount += 1
@@ -23,10 +25,12 @@ public final class MockSleepAssertionManager: SleepAssertionManaging {
 public final class MockPreferencesManager: PreferencesManaging {
     public var startAtLogin: Bool = false
     public var activateOnLaunch: Bool = false
+    public var preventLogout: Bool = true
 
-    public init(startAtLogin: Bool = false, activateOnLaunch: Bool = false) {
+    public init(startAtLogin: Bool = false, activateOnLaunch: Bool = false, preventLogout: Bool = true) {
         self.startAtLogin = startAtLogin
         self.activateOnLaunch = activateOnLaunch
+        self.preventLogout = preventLogout
     }
 }
 

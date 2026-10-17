@@ -59,10 +59,11 @@ Custom vector-rendered status bar icons seamlessly adapt to both Light Mode and 
 * **Inactive**: Rounded rectangle with a calm flatline (`pulse-off`).
 * **Theme-Aware**: Renders a high-contrast dark badge with white line in Light Mode, and a crisp light badge with dark line in Dark Mode.
 
-### Persistent Launch & Login Controls
+### Persistent Controls & Options
 Includes native, visible checkbox toggles for your environment:
 * **Start at Login**: Registers StayOn to start when your Mac boots (using `SMAppService` on macOS 13+ and `SMLoginItemSetEnabled` on macOS 12).
 * **Activate on Launch**: Automatically enables indefinite sleep prevention every time the app opens.
+* **Prevent Logout**: Keeps display awake and periodically declares user activity via native IOKit assertions (`IOPMAssertionDeclareUserActivity`), suppressing inactivity logouts and lock screens just like Caffeine without requiring Accessibility permissions.
 
 ---
 
@@ -77,11 +78,12 @@ Includes native, visible checkbox toggles for your environment:
                                   ├── 8 Precision Timers (5m – 4h)
                                   ├── ☑ Start at Login
                                   ├── ☑ Activate on Launch
+                                  ├── ☑ Prevent Logout
                                   └── Quit StayOn
 ```
 
 1. **Activate**: Left-click the menu bar icon for indefinite mode, or right-click and pick a duration.
-2. **Assertion Held**: StayOn holds a single, unified `ProcessInfo.idleSystemSleepDisabled` assertion with the operating system.
+2. **Assertion Held**: StayOn holds unified `ProcessInfo` sleep assertions (`idleSystemSleepDisabled` and optionally `idleDisplaySleepDisabled`) alongside native IOKit user activity heartbeat declarations when Prevent Logout is enabled.
 3. **Auto-Expiration**: When a timer concludes, StayOn automatically releases the assertion and returns the icon to inactive with zero user intervention required.
 
 ---
@@ -89,7 +91,7 @@ Includes native, visible checkbox toggles for your environment:
 ## What Makes It Different
 
 * **True Menu Bar Citizen (`LSUIElement = true`)**: No Dock icon, no command center window, and no application switcher footprint.
-* **Display Sleep Preserved**: Unlike crude caffeinate wrappers, StayOn prevents idle system sleep without forcing your display to remain at full brightness unless your system settings explicitly mandate it.
+* **Zero Accessibility Permissions**: Works just like Caffeine, preventing system sleep, display sleep, and automatic inactivity logouts without simulated mouse/keyboard events or invasive macOS Accessibility permissions.
 * **Deterministic Assertion Lifecycle**: Exactly one system assertion is held at any time. Switching between indefinite and timed modes reuses the active assertion without churn, and deactivation, expiration, or quitting releases it instantly.
 * **Zero Dependencies**: Pure Swift and AppKit. No Electron, no Node runtime, no external package dependencies.
 

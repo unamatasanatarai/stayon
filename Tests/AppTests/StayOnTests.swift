@@ -295,6 +295,23 @@ public enum StayOnTests {
             assert(prefs.activateOnLaunch == false)
         }
 
+        testRunner("setPreventLogout persists preference and updates active assertion") {
+            let prefs = MockPreferencesManager(preventLogout: true)
+            let assertion = MockSleepAssertionManager()
+            let model = StayOnModel(assertionManager: assertion, preferences: prefs)
+
+            model.setPreventLogout(false)
+            assert(prefs.preventLogout == false)
+            assert(assertion.lastPreventLogout == nil)
+
+            model.activateIndefinitely()
+            assert(assertion.lastPreventLogout == false)
+
+            model.setPreventLogout(true)
+            assert(prefs.preventLogout == true)
+            assert(assertion.lastPreventLogout == true)
+        }
+
         // MARK: - UI & Menu Specification Suite
         testRunner("Menu layout matches exact spec order and structure") {
             let model = StayOnModel()
@@ -308,9 +325,10 @@ public enum StayOnTests {
             // 10: Separator
             // 11: Start at Login
             // 12: Activate on Launch
-            // 13: Separator
-            // 14: Quit StayOn
-            assert(menu.items.count == 15, "Menu must have exactly 15 items including separators")
+            // 13: Prevent Logout
+            // 14: Separator
+            // 15: Quit StayOn
+            assert(menu.items.count == 16, "Menu must have exactly 16 items including separators")
 
             // Status item
             assert(menu.items[0] === controller.statusMenuItem)
@@ -344,14 +362,19 @@ public enum StayOnTests {
             assert(controller.activateOnLaunchMenuItem.onStateImage != nil, "Must have checked box image")
             assert(controller.activateOnLaunchMenuItem.offStateImage != nil, "Must have unchecked box image")
 
+            assert(menu.items[13] === controller.preventLogoutMenuItem)
+            assert(menu.items[13].title == "Prevent Logout")
+            assert(controller.preventLogoutMenuItem.onStateImage != nil, "Must have checked box image")
+            assert(controller.preventLogoutMenuItem.offStateImage != nil, "Must have unchecked box image")
+
             // Separator 3
-            assert(menu.items[13].isSeparatorItem)
+            assert(menu.items[14].isSeparatorItem)
 
             // Quit item
-            assert(menu.items[14] === controller.quitMenuItem)
-            assert(menu.items[14].title == "Quit StayOn")
-            assert(menu.items[14].keyEquivalent == "q")
-            assert(menu.items[14].keyEquivalentModifierMask == [.command])
+            assert(menu.items[15] === controller.quitMenuItem)
+            assert(menu.items[15].title == "Quit StayOn")
+            assert(menu.items[15].keyEquivalent == "q")
+            assert(menu.items[15].keyEquivalentModifierMask == [.command])
         }
 
         testRunner("Status bar icon provides distinct active and inactive images for light and dark modes") {
