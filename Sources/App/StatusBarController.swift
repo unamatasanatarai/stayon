@@ -57,8 +57,13 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         contextMenu.autoenablesItems = false
 
         // 1. Dynamic status item
-        statusMenuItem = NSMenuItem(title: model.statusText(), action: nil, keyEquivalent: "")
-        statusMenuItem.isEnabled = false
+        statusMenuItem = NSMenuItem(
+            title: model.statusText(),
+            action: #selector(statusMenuItemClicked(_:)),
+            keyEquivalent: ""
+        )
+        statusMenuItem.target = self
+        statusMenuItem.isEnabled = true
         contextMenu.addItem(statusMenuItem)
 
         contextMenu.addItem(NSMenuItem.separator())
@@ -196,6 +201,14 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     // MARK: - Menu Actions
+
+    @objc private func statusMenuItemClicked(_ sender: NSMenuItem) {
+        if model.state.isActive {
+            model.deactivate()
+        } else {
+            model.activateIndefinitely()
+        }
+    }
 
     @objc private func durationSelected(_ sender: NSMenuItem) {
         let seconds = TimeInterval(sender.tag)

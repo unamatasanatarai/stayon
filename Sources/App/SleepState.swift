@@ -40,13 +40,13 @@ public enum SleepState: Equatable {
     public func statusText(at date: Date = Date()) -> String {
         switch self {
         case .inactive:
-            return "Inactive"
+            return "Activate Indefinitely"
         case .activeIndefinite:
             return "Active"
         case .activeTimed(let deadline):
             let remaining = deadline.timeIntervalSince(date)
             if remaining <= 0 {
-                return "Inactive"
+                return "Activate Indefinitely"
             }
             if remaining < 60 {
                 return "Active \u{2014} Less than 1 minute left"

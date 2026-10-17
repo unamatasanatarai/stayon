@@ -24,7 +24,7 @@ public enum StayOnTests {
             let baseDate = Date(timeIntervalSince1970: 1000000)
 
             // Inactive
-            assert(SleepState.inactive.statusText(at: baseDate) == "Inactive")
+            assert(SleepState.inactive.statusText(at: baseDate) == "Activate Indefinitely")
 
             // Active Indefinite
             assert(SleepState.activeIndefinite.statusText(at: baseDate) == "Active")
@@ -54,10 +54,10 @@ public enum StayOnTests {
 
             // Expired (0 or negative)
             let deadline0s = baseDate
-            assert(SleepState.activeTimed(deadline: deadline0s).statusText(at: baseDate) == "Inactive")
+            assert(SleepState.activeTimed(deadline: deadline0s).statusText(at: baseDate) == "Activate Indefinitely")
 
             let deadlinePast = baseDate.addingTimeInterval(-10)
-            assert(SleepState.activeTimed(deadline: deadlinePast).statusText(at: baseDate) == "Inactive")
+            assert(SleepState.activeTimed(deadline: deadlinePast).statusText(at: baseDate) == "Activate Indefinitely")
         }
 
         // MARK: - State Transitions Suite
@@ -314,8 +314,8 @@ public enum StayOnTests {
 
             // Status item
             assert(menu.items[0] === controller.statusMenuItem)
-            assert(menu.items[0].isEnabled == false, "Status item must be disabled/informational")
-            assert(menu.items[0].title == "Inactive")
+            assert(menu.items[0].isEnabled == true, "Status item must be enabled to activate/deactivate")
+            assert(menu.items[0].title == "Activate Indefinitely")
 
             // Separator 1
             assert(menu.items[1].isSeparatorItem)
@@ -375,7 +375,7 @@ public enum StayOnTests {
             let model = StayOnModel(assertionManager: assertion, timerScheduler: timer)
             let controller = StatusBarController(model: model)
 
-            assert(controller.statusMenuItem.title == "Inactive")
+            assert(controller.statusMenuItem.title == "Activate Indefinitely")
 
             model.activateIndefinitely()
             controller.updateMenuContent()
@@ -387,7 +387,31 @@ public enum StayOnTests {
 
             model.deactivate()
             controller.updateMenuContent()
-            assert(controller.statusMenuItem.title == "Inactive")
+            assert(controller.statusMenuItem.title == "Activate Indefinitely")
+        }
+
+        testRunner("Clicking statusMenuItem activates when inactive and deactivates when active") {
+            let assertion = MockSleepAssertionManager()
+            let timer = MockTimerScheduler()
+            let model = StayOnModel(assertionManager: assertion, timerScheduler: timer)
+            let controller = StatusBarController(model: model)
+
+            // When inactive: clicking activates indefinitely
+            assert(!model.state.isActive)
+            assert(controller.statusMenuItem.title == "Activate Indefinitely")
+            _ = controller.statusMenuItem.target?.perform(controller.statusMenuItem.action, with: controller.statusMenuItem)
+            assert(model.state.isActive)
+            assert(model.state == .activeIndefinite)
+
+            // When active timed: clicking deactivates
+            model.activateTimed(duration: .fifteenMinutes)
+            controller.updateMenuContent()
+            assert(controller.statusMenuItem.title.contains("Active \u{2014}"))
+            _ = controller.statusMenuItem.target?.perform(controller.statusMenuItem.action, with: controller.statusMenuItem)
+            assert(!model.state.isActive)
+            assert(model.state == .inactive)
+            controller.updateMenuContent()
+            assert(controller.statusMenuItem.title == "Activate Indefinitely")
         }
     }
 }
