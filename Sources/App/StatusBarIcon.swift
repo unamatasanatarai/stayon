@@ -62,12 +62,15 @@ public enum StatusBarIcon {
         return image
     }
 
+    public static let iconWhiteColor = NSColor(srgbRed: 0xe9 / 255.0, green: 0xe9 / 255.0, blue: 0xe9 / 255.0, alpha: 1.0)
+    public static let iconBlackColor = NSColor(srgbRed: 0x20 / 255.0, green: 0x20 / 255.0, blue: 0x20 / 255.0, alpha: 1.0)
+
     private static func drawIcon(in rect: NSRect, ctx: CGContext, isActive: Bool, isDark: Bool) {
         // User specification:
-        // Light mode: dark background with white (or transparent) line
-        // Dark mode: light background with dark line
-        let bgColor = isDark ? NSColor.white : NSColor.black
-        let lineColor = isDark ? NSColor.black : NSColor.white
+        // Light mode: dark (#202020) background with white (#e9e9e9) line
+        // Dark mode: light (#e9e9e9) background with dark (#202020) line
+        let bgColor = isDark ? iconWhiteColor : iconBlackColor
+        let lineColor = isDark ? iconBlackColor : iconWhiteColor
 
         let badgeMargin: CGFloat = 1.0
         let badgeRect = CGRect(

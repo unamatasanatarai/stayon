@@ -390,6 +390,18 @@ public enum StayOnTests {
 
             assert(activeDark.isTemplate == false, "Must preserve custom two-tone appearance")
             assert(activeLight.isTemplate == false, "Must preserve custom two-tone appearance")
+
+            let whiteColor = StatusBarIcon.iconWhiteColor
+            let expected = CGFloat(0xe9) / 255.0
+            assert(abs(whiteColor.redComponent - expected) < 0.001, "White color red component must match #e9e9e9")
+            assert(abs(whiteColor.greenComponent - expected) < 0.001, "White color green component must match #e9e9e9")
+            assert(abs(whiteColor.blueComponent - expected) < 0.001, "White color blue component must match #e9e9e9")
+
+            let blackColor = StatusBarIcon.iconBlackColor
+            let expectedBlack = CGFloat(0x20) / 255.0
+            assert(abs(blackColor.redComponent - expectedBlack) < 0.001, "Black color red component must match #202020")
+            assert(abs(blackColor.greenComponent - expectedBlack) < 0.001, "Black color green component must match #202020")
+            assert(abs(blackColor.blueComponent - expectedBlack) < 0.001, "Black color blue component must match #202020")
         }
 
         testRunner("Menu updates status title dynamically on state changes") {
