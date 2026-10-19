@@ -2,7 +2,8 @@ import Foundation
 import AppKit
 
 public enum StayOnTests {
-    public static func run(testRunner: (String, () throws -> Void) -> Void) {
+    @MainActor
+    public static func run(testRunner: @MainActor (String, @MainActor () throws -> Void) -> Void) {
         // MARK: - Duration & Formatting Suite
         testRunner("Duration definitions match spec exactly") {
             assert(StayOnDuration.allCases.count == 8, "Must have exactly 8 predefined durations")
@@ -24,7 +25,7 @@ public enum StayOnTests {
             let baseDate = Date(timeIntervalSince1970: 1000000)
 
             // Inactive
-            assert(SleepState.inactive.statusText(at: baseDate) == "Activate Indefinitely")
+            assert(SleepState.inactive.statusText(at: baseDate) == "Inactive")
 
             // Active Indefinite
             assert(SleepState.activeIndefinite.statusText(at: baseDate) == "Active")
@@ -54,10 +55,10 @@ public enum StayOnTests {
 
             // Expired (0 or negative)
             let deadline0s = baseDate
-            assert(SleepState.activeTimed(deadline: deadline0s).statusText(at: baseDate) == "Activate Indefinitely")
+            assert(SleepState.activeTimed(deadline: deadline0s).statusText(at: baseDate) == "Inactive")
 
             let deadlinePast = baseDate.addingTimeInterval(-10)
-            assert(SleepState.activeTimed(deadline: deadlinePast).statusText(at: baseDate) == "Activate Indefinitely")
+            assert(SleepState.activeTimed(deadline: deadlinePast).statusText(at: baseDate) == "Inactive")
         }
 
         // MARK: - State Transitions Suite
@@ -332,8 +333,8 @@ public enum StayOnTests {
 
             // Status item
             assert(menu.items[0] === controller.statusMenuItem)
-            assert(menu.items[0].isEnabled == true, "Status item must be enabled to activate/deactivate")
-            assert(menu.items[0].title == "Activate Indefinitely")
+            assert(menu.items[0].isEnabled == false, "Status item must be disabled/informational per spec")
+            assert(menu.items[0].title == "Inactive")
 
             // Separator 1
             assert(menu.items[1].isSeparatorItem)
@@ -375,6 +376,8 @@ public enum StayOnTests {
             assert(menu.items[15].title == "Quit StayOn")
             assert(menu.items[15].keyEquivalent == "q")
             assert(menu.items[15].keyEquivalentModifierMask == [.command])
+
+            controller.teardown()
         }
 
         testRunner("Status bar icon provides distinct active and inactive images for light and dark modes") {
@@ -410,7 +413,7 @@ public enum StayOnTests {
             let model = StayOnModel(assertionManager: assertion, timerScheduler: timer)
             let controller = StatusBarController(model: model)
 
-            assert(controller.statusMenuItem.title == "Activate Indefinitely")
+            assert(controller.statusMenuItem.title == "Inactive")
 
             model.activateIndefinitely()
             controller.updateMenuContent()
@@ -422,31 +425,78 @@ public enum StayOnTests {
 
             model.deactivate()
             controller.updateMenuContent()
-            assert(controller.statusMenuItem.title == "Activate Indefinitely")
+            assert(controller.statusMenuItem.title == "Inactive")
+            controller.teardown()
         }
 
-        testRunner("Clicking statusMenuItem activates when inactive and deactivates when active") {
+        testRunner("Status menu item is informational and does not change state per spec Section 4.1") {
             let assertion = MockSleepAssertionManager()
             let timer = MockTimerScheduler()
             let model = StayOnModel(assertionManager: assertion, timerScheduler: timer)
             let controller = StatusBarController(model: model)
 
-            // When inactive: clicking activates indefinitely
+            // When inactive: status item is disabled and has no action
             assert(!model.state.isActive)
-            assert(controller.statusMenuItem.title == "Activate Indefinitely")
-            _ = controller.statusMenuItem.target?.perform(controller.statusMenuItem.action, with: controller.statusMenuItem)
-            assert(model.state.isActive)
-            assert(model.state == .activeIndefinite)
+            assert(controller.statusMenuItem.title == "Inactive")
+            assert(controller.statusMenuItem.isEnabled == false, "Status item must be disabled/informational")
+            assert(controller.statusMenuItem.action == nil, "Status item must have no click action")
 
-            // When active timed: clicking deactivates
+            // Status does not change state when attempting click
+            assert(!model.state.isActive)
+
+            // When active timed: status item remains informational and disabled
             model.activateTimed(duration: .fifteenMinutes)
             controller.updateMenuContent()
             assert(controller.statusMenuItem.title.contains("Active \u{2014}"))
-            _ = controller.statusMenuItem.target?.perform(controller.statusMenuItem.action, with: controller.statusMenuItem)
-            assert(!model.state.isActive)
-            assert(model.state == .inactive)
+            assert(controller.statusMenuItem.isEnabled == false)
+            assert(controller.statusMenuItem.action == nil)
+            assert(model.state.isActive)
+
+            controller.teardown()
+        }
+
+        testRunner("VoiceOver accessibility label and value are updated dynamically") {
+            let assertion = MockSleepAssertionManager()
+            let timer = MockTimerScheduler()
+            let model = StayOnModel(assertionManager: assertion, timerScheduler: timer)
+            let controller = StatusBarController(model: model)
+
+            guard let button = controller.currentStatusItem?.button else {
+                assertionFailure("Status button must exist")
+                return
+            }
+
+            assert(button.accessibilityLabel() == AppConfig.appName)
+            assert(button.accessibilityValue() as? String == "Inactive")
+            assert(button.toolTip == "\(AppConfig.appName): Inactive")
+
+            model.activateTimed(duration: .thirtyMinutes)
             controller.updateMenuContent()
-            assert(controller.statusMenuItem.title == "Activate Indefinitely")
+
+            assert(button.accessibilityValue() as? String == "Active \u{2014} 30 minutes left")
+            assert(button.toolTip == "\(AppConfig.appName): Active \u{2014} 30 minutes left")
+
+            controller.teardown()
+        }
+
+        testRunner("Launch symmetrically deselects startAtLogin when disabled in system") {
+            let prefs = MockPreferencesManager(startAtLogin: true)
+            let loginItem = MockLoginItemManager(isRegisteredAtLogin: false)
+            let model = StayOnModel(preferences: prefs, loginItemManager: loginItem)
+
+            assert(prefs.startAtLogin == true)
+            model.handleLaunch()
+
+            assert(prefs.startAtLogin == false, "Must sync with system registration when false")
+            assert(model.isStartAtLoginEnabled == false, "Must return false when system registration is false")
+        }
+
+        testRunner("Controller teardown removes status item cleanly") {
+            let controller = StatusBarController()
+            assert(controller.currentStatusItem != nil)
+
+            controller.teardown()
+            assert(controller.currentStatusItem == nil, "Status item must be removed from system and nil'd")
         }
     }
 }

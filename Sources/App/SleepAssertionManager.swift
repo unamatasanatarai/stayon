@@ -1,5 +1,6 @@
 import Foundation
 import IOKit.pwr_mgt
+import os
 
 public protocol SleepAssertionManaging: AnyObject {
     var isAssertionActive: Bool { get }
@@ -13,12 +14,14 @@ public extension SleepAssertionManaging {
     }
 }
 
+
 public final class ProcessInfoSleepAssertionManager: SleepAssertionManaging {
     private var activityToken: NSObjectProtocol?
     private var userActivityAssertionID: IOPMAssertionID = 0
     private var heartbeatTimer: DispatchSourceTimer?
     private let heartbeatQueue = DispatchQueue(label: "com.stayon.heartbeat", qos: .utility)
     private var currentPreventLogout: Bool = false
+    private var lock = os_unfair_lock_s()
 
     public init() {}
 
@@ -27,17 +30,20 @@ public final class ProcessInfoSleepAssertionManager: SleepAssertionManaging {
     }
 
     public var isAssertionActive: Bool {
+        os_unfair_lock_lock(&lock)
+        defer { os_unfair_lock_unlock(&lock) }
         return activityToken != nil
     }
 
     public func acquireAssertion(preventLogout: Bool = true) {
+        os_unfair_lock_lock(&lock)
         if activityToken != nil {
             if currentPreventLogout == preventLogout {
-                // Already holding matching active assertion, reuse it
+                os_unfair_lock_unlock(&lock)
                 return
             }
-            // Configuration changed while active - release previous token and re-acquire
-            releaseAssertion()
+            // Configuration changed while active - internal release before re-acquiring
+            internalReleaseAssertion()
         }
 
         currentPreventLogout = preventLogout
@@ -55,42 +61,61 @@ public final class ProcessInfoSleepAssertionManager: SleepAssertionManaging {
         )
 
         if preventLogout {
-            startHeartbeat()
+            internalStartHeartbeat()
         } else {
-            stopHeartbeat()
+            internalStopHeartbeat()
         }
+        os_unfair_lock_unlock(&lock)
     }
 
     public func releaseAssertion() {
-        stopHeartbeat()
+        os_unfair_lock_lock(&lock)
+        internalReleaseAssertion()
+        os_unfair_lock_unlock(&lock)
+    }
+
+    // Must be called with lock held
+    private func internalReleaseAssertion() {
+        internalStopHeartbeat()
         if userActivityAssertionID != 0 {
             IOPMAssertionRelease(userActivityAssertionID)
             userActivityAssertionID = 0
         }
-        guard let token = activityToken else { return }
-        ProcessInfo.processInfo.endActivity(token)
-        activityToken = nil
+        if let token = activityToken {
+            ProcessInfo.processInfo.endActivity(token)
+            activityToken = nil
+        }
     }
 
-    private func startHeartbeat() {
-        stopHeartbeat()
-        declareUserActivity()
+    // Must be called with lock held
+    private func internalStartHeartbeat() {
+        internalStopHeartbeat()
+        internalDeclareUserActivity()
 
         let timer = DispatchSource.makeTimerSource(queue: heartbeatQueue)
         timer.schedule(deadline: .now() + 30.0, repeating: 30.0)
         timer.setEventHandler { [weak self] in
-            self?.declareUserActivity()
+            self?.performHeartbeat()
         }
         timer.resume()
         heartbeatTimer = timer
     }
 
-    private func stopHeartbeat() {
+    // Must be called with lock held
+    private func internalStopHeartbeat() {
         heartbeatTimer?.cancel()
         heartbeatTimer = nil
     }
 
-    private func declareUserActivity() {
+    private func performHeartbeat() {
+        os_unfair_lock_lock(&lock)
+        defer { os_unfair_lock_unlock(&lock) }
+        guard activityToken != nil, currentPreventLogout else { return }
+        internalDeclareUserActivity()
+    }
+
+    // Must be called with lock held
+    private func internalDeclareUserActivity() {
         _ = IOPMAssertionDeclareUserActivity(
             "StayOn User Active Heartbeat" as CFString,
             kIOPMUserActiveLocal,
@@ -98,4 +123,5 @@ public final class ProcessInfoSleepAssertionManager: SleepAssertionManaging {
         )
     }
 }
+
 

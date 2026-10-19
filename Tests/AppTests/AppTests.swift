@@ -1,7 +1,8 @@
 import Foundation
 
 public enum AppTests {
-    public static func run(testRunner: (String, () throws -> Void) -> Void) {
+    @MainActor
+    public static func run(testRunner: @MainActor (String, @MainActor () throws -> Void) -> Void) {
         testRunner("AppConfig returns valid non-empty application name") {
             assert(!AppConfig.appName.isEmpty, "App name should not be empty")
         }
@@ -23,6 +24,7 @@ public enum AppTests {
             let controller = StatusBarController()
             assert(controller.currentMenu.items.count >= 2, "Menu should have items")
             assert(controller.currentMenu.items.contains { $0.title.contains("Quit") }, "Menu should contain quit item")
+            controller.teardown()
         }
 
         testRunner("ProcessInfoSleepAssertionManager acquires and releases assertion correctly") {
@@ -38,6 +40,27 @@ public enum AppTests {
             assert(!manager.isAssertionActive, "Assertion should be inactive after release")
             manager.releaseAssertion()
             assert(!manager.isAssertionActive, "Assertion should remain inactive on redundant release")
+        }
+
+        testRunner("ProcessInfoSleepAssertionManager handles concurrent acquire and release safely") {
+            let manager = ProcessInfoSleepAssertionManager()
+            let group = DispatchGroup()
+            let queue = DispatchQueue(label: "com.stayon.test.concurrent", attributes: .concurrent)
+
+            for i in 0..<50 {
+                group.enter()
+                queue.async {
+                    if i % 2 == 0 {
+                        manager.acquireAssertion(preventLogout: i % 4 == 0)
+                    } else {
+                        manager.releaseAssertion()
+                    }
+                    group.leave()
+                }
+            }
+            _ = group.wait(timeout: .now() + 5.0)
+            manager.releaseAssertion()
+            assert(!manager.isAssertionActive)
         }
     }
 }

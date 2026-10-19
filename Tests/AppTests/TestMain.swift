@@ -2,6 +2,7 @@ import Cocoa
 
 @main
 struct TestMain {
+    @MainActor
     static func main() {
         // Initialize NSApplication for AppKit UI components
         _ = NSApplication.shared
@@ -14,7 +15,7 @@ struct TestMain {
         var failed = 0
         let totalStart = CFAbsoluteTimeGetCurrent()
 
-        let runTest: (String, () throws -> Void) -> Void = { name, block in
+        let runTest: @MainActor (String, @MainActor () throws -> Void) -> Void = { name, block in
             let start = CFAbsoluteTimeGetCurrent()
             do {
                 try block()

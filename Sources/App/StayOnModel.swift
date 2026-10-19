@@ -50,9 +50,7 @@ public final class StayOnModel {
     }
 
     public func handleLaunch() {
-        if loginItemManager.isRegisteredAtLogin {
-            preferences.startAtLogin = true
-        }
+        preferences.startAtLogin = loginItemManager.isRegisteredAtLogin
 
         if preferences.activateOnLaunch {
             activateIndefinitely()
@@ -110,7 +108,7 @@ public final class StayOnModel {
     }
 
     public var isStartAtLoginEnabled: Bool {
-        return preferences.startAtLogin || loginItemManager.isRegisteredAtLogin
+        return loginItemManager.isRegisteredAtLogin
     }
 
     public func setStartAtLogin(_ enabled: Bool) -> Bool {
@@ -120,10 +118,11 @@ public final class StayOnModel {
             } else {
                 try loginItemManager.unregister()
             }
-            preferences.startAtLogin = enabled
+            preferences.startAtLogin = loginItemManager.isRegisteredAtLogin
             return true
         } catch {
             NSLog("Failed to set startAtLogin to %@: %@", enabled ? "true" : "false", error.localizedDescription)
+            preferences.startAtLogin = loginItemManager.isRegisteredAtLogin
             return false
         }
     }

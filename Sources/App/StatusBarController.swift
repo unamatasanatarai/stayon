@@ -1,8 +1,9 @@
 import Cocoa
 
+@MainActor
 public final class StatusBarController: NSObject, NSMenuDelegate {
     public let model: StayOnModel
-    private var statusItem: NSStatusItem!
+    private var statusItem: NSStatusItem?
     private var contextMenu: NSMenu!
     private var menuUpdateTimer: Timer?
 
@@ -15,6 +16,9 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
     public private(set) var quitMenuItem: NSMenuItem!
 
     private var appearanceObservation: NSKeyValueObservation?
+    private var themeObserverToken: NSObjectProtocol?
+    private var wakeObserverToken: NSObjectProtocol?
+    private var clockObserverToken: NSObjectProtocol?
 
     public init(model: StayOnModel = StayOnModel()) {
         self.model = model
@@ -22,34 +26,85 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
 
         setupStatusItem()
         setupContextMenu()
-        setupAppearanceObserver()
+        setupAppearanceAndSystemObservers()
 
         model.onStateChange = { [weak self] _ in
-            DispatchQueue.main.async {
+            if Thread.isMainThread {
                 self?.updateIcon()
                 self?.refreshStatusMenuItem()
+            } else {
+                DispatchQueue.main.async {
+                    self?.updateIcon()
+                    self?.refreshStatusMenuItem()
+                }
             }
         }
 
         updateIcon()
     }
 
+    deinit {
+        menuUpdateTimer?.invalidate()
+        appearanceObservation?.invalidate()
+        if let token = themeObserverToken {
+            DistributedNotificationCenter.default().removeObserver(token)
+        }
+        if let token = wakeObserverToken {
+            NSWorkspace.shared.notificationCenter.removeObserver(token)
+        }
+        if let token = clockObserverToken {
+            NotificationCenter.default.removeObserver(token)
+        }
+        if let item = statusItem {
+            if Thread.isMainThread {
+                NSStatusBar.system.removeStatusItem(item)
+            }
+        }
+    }
+
+    public func teardown() {
+        stopMenuTimer()
+        appearanceObservation?.invalidate()
+        appearanceObservation = nil
+
+        if let token = themeObserverToken {
+            DistributedNotificationCenter.default().removeObserver(token)
+            themeObserverToken = nil
+        }
+        if let token = wakeObserverToken {
+            NSWorkspace.shared.notificationCenter.removeObserver(token)
+            wakeObserverToken = nil
+        }
+        if let token = clockObserverToken {
+            NotificationCenter.default.removeObserver(token)
+            clockObserverToken = nil
+        }
+        if let item = statusItem {
+            NSStatusBar.system.removeStatusItem(item)
+            statusItem = nil
+        }
+    }
+
     public var currentMenu: NSMenu {
         return contextMenu
     }
 
-    public var currentStatusItem: NSStatusItem {
+    public var currentStatusItem: NSStatusItem? {
         return statusItem
     }
 
     private func setupStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        guard let button = statusItem.button else { return }
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem = item
+        guard let button = item.button else { return }
 
         button.target = self
         button.action = #selector(statusBarButtonClicked(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        button.toolTip = AppConfig.appName
+        button.toolTip = "\(AppConfig.appName): \(model.statusText())"
+        button.setAccessibilityElement(true)
+        button.setAccessibilityLabel(AppConfig.appName)
+        button.setAccessibilityValue(model.statusText())
     }
 
     private func setupContextMenu() {
@@ -57,14 +112,14 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         contextMenu.delegate = self
         contextMenu.autoenablesItems = false
 
-        // 1. Dynamic status item
+        // 1. Dynamic status item (informational only per spec Section 4.1)
         statusMenuItem = NSMenuItem(
             title: model.statusText(),
-            action: #selector(statusMenuItemClicked(_:)),
+            action: nil,
             keyEquivalent: ""
         )
-        statusMenuItem.target = self
-        statusMenuItem.isEnabled = true
+        statusMenuItem.target = nil
+        statusMenuItem.isEnabled = false
         contextMenu.addItem(statusMenuItem)
 
         contextMenu.addItem(NSMenuItem.separator())
@@ -134,27 +189,55 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         updateMenuContent()
     }
 
-    private func setupAppearanceObserver() {
+    private func setupAppearanceAndSystemObservers() {
         appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 self?.updateIcon()
             }
         }
 
-        DistributedNotificationCenter.default().addObserver(
+        themeObserverToken = DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name("AppleInterfaceThemeChangedNotification"),
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.updateIcon()
+            DispatchQueue.main.async { [weak self] in
+                self?.updateIcon()
+            }
+        }
+
+        wakeObserverToken = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            DispatchQueue.main.async { [weak self] in
+                self?.model.checkExpiration()
+                self?.updateIcon()
+                self?.updateMenuContent()
+            }
+        }
+
+        clockObserverToken = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name.NSSystemClockDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            DispatchQueue.main.async { [weak self] in
+                self?.model.checkExpiration()
+                self?.updateIcon()
+                self?.updateMenuContent()
+            }
         }
     }
 
     public func updateIcon() {
-        guard let button = statusItem.button else { return }
+        guard let button = statusItem?.button else { return }
         let appearance = button.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) ?? NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
         let isDark = (appearance == .darkAqua)
         button.image = StatusBarIcon.image(isActive: model.state.isActive, isDark: isDark)
+        button.toolTip = "\(AppConfig.appName): \(model.statusText())"
+        button.setAccessibilityValue(model.statusText())
     }
 
     public func updateMenuContent() {
@@ -166,11 +249,17 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
 
     public func refreshStatusMenuItem() {
         statusMenuItem.title = model.statusText()
+        if let button = statusItem?.button {
+            button.toolTip = "\(AppConfig.appName): \(model.statusText())"
+            button.setAccessibilityValue(model.statusText())
+        }
     }
 
     @objc public func statusBarButtonClicked(_ sender: NSStatusBarButton) {
         let event = NSApp.currentEvent
-        let isRightClick = event?.type == .rightMouseUp || (event?.modifierFlags.contains(.control) == true)
+        let isRightClick = event?.type == .rightMouseUp ||
+                           event?.type == .rightMouseDown ||
+                           (event?.modifierFlags.contains(.control) == true)
 
         if isRightClick {
             openContextMenu()
@@ -181,8 +270,8 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
 
     public func openContextMenu() {
         updateMenuContent()
-        statusItem.menu = contextMenu
-        statusItem.button?.performClick(nil)
+        statusItem?.menu = contextMenu
+        statusItem?.button?.performClick(nil)
     }
 
     // MARK: - NSMenuDelegate
@@ -194,13 +283,15 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
 
     public func menuDidClose(_ menu: NSMenu) {
         stopMenuTimer()
-        statusItem.menu = nil
+        statusItem?.menu = nil
     }
 
     private func startMenuTimer() {
         stopMenuTimer()
         menuUpdateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.refreshStatusMenuItem()
+            DispatchQueue.main.async { [weak self] in
+                self?.refreshStatusMenuItem()
+            }
         }
         if let timer = menuUpdateTimer {
             RunLoop.current.add(timer, forMode: .common)
@@ -214,14 +305,6 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     // MARK: - Menu Actions
-
-    @objc private func statusMenuItemClicked(_ sender: NSMenuItem) {
-        if model.state.isActive {
-            model.deactivate()
-        } else {
-            model.activateIndefinitely()
-        }
-    }
 
     @objc private func durationSelected(_ sender: NSMenuItem) {
         let seconds = TimeInterval(sender.tag)
@@ -248,6 +331,8 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func quitAction(_ sender: NSMenuItem) {
         model.handleQuit()
+        teardown()
         NSApp.terminate(nil)
     }
 }
+

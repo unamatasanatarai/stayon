@@ -128,7 +128,10 @@ else
 fi
 
 # Reverse chronological traversal so summaries read oldest to newest.
-readarray -t commit_list < <(git rev-list --reverse "$commit_range")
+commit_list=()
+while IFS= read -r commit_hash; do
+    [[ -n "$commit_hash" ]] && commit_list+=("$commit_hash")
+done < <(git rev-list --reverse "$commit_range")
 
 ((${#commit_list[@]} > 0)) ||
     die "No commits found since the previous version tag."
