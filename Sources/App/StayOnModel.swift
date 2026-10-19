@@ -10,7 +10,9 @@ public final class DispatchTimerScheduler: TimerScheduling {
 
     public func schedule(after interval: TimeInterval, action: @escaping () -> Void) -> AnyObject {
         let item = DispatchWorkItem(block: action)
-        DispatchQueue.main.asyncAfter(deadline: .now() + interval, execute: item)
+        // Wall-clock deadline keeps counting while the Mac sleeps; a monotonic
+        // DispatchTime would fire late by the time spent asleep.
+        DispatchQueue.main.asyncAfter(wallDeadline: .now() + interval, execute: item)
         return item
     }
 
@@ -50,7 +52,8 @@ public final class StayOnModel {
     }
 
     public func handleLaunch() {
-        preferences.startAtLogin = loginItemManager.isRegisteredAtLogin
+        // Login-item state lives in the system; isStartAtLoginEnabled reads it directly.
+        loginItemManager.refreshRegistration()
 
         if preferences.activateOnLaunch {
             activateIndefinitely()
@@ -83,10 +86,7 @@ public final class StayOnModel {
 
         let deadline = now.addingTimeInterval(seconds)
         state = .activeTimed(deadline: deadline)
-
-        activeTimerToken = timerScheduler.schedule(after: seconds) { [weak self] in
-            self?.handleTimerExpiration()
-        }
+        scheduleExpiration(after: seconds)
     }
 
     public func deactivate() {
@@ -99,6 +99,19 @@ public final class StayOnModel {
         guard case .activeTimed(let deadline) = state else { return }
         if date >= deadline {
             handleTimerExpiration()
+        }
+    }
+
+    /// Call after wake or a system clock change: expires a passed deadline, or
+    /// re-arms the expiration timer for the remaining wall-clock time.
+    public func handleSystemTimeChange(at date: Date = Date()) {
+        guard case .activeTimed(let deadline) = state else { return }
+        let remaining = deadline.timeIntervalSince(date)
+        if remaining <= 0 {
+            handleTimerExpiration()
+        } else {
+            cancelExistingTimer()
+            scheduleExpiration(after: remaining)
         }
     }
 
@@ -118,11 +131,9 @@ public final class StayOnModel {
             } else {
                 try loginItemManager.unregister()
             }
-            preferences.startAtLogin = loginItemManager.isRegisteredAtLogin
             return true
         } catch {
             NSLog("Failed to set startAtLogin to %@: %@", enabled ? "true" : "false", error.localizedDescription)
-            preferences.startAtLogin = loginItemManager.isRegisteredAtLogin
             return false
         }
     }
@@ -154,6 +165,12 @@ public final class StayOnModel {
         if let token = activeTimerToken {
             timerScheduler.cancel(token)
             activeTimerToken = nil
+        }
+    }
+
+    private func scheduleExpiration(after seconds: TimeInterval) {
+        activeTimerToken = timerScheduler.schedule(after: seconds) { [weak self] in
+            self?.handleTimerExpiration()
         }
     }
 

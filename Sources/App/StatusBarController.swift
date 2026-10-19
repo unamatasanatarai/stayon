@@ -212,7 +212,7 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
             queue: .main
         ) { [weak self] _ in
             DispatchQueue.main.async { [weak self] in
-                self?.model.checkExpiration()
+                self?.model.handleSystemTimeChange()
                 self?.updateIcon()
                 self?.updateMenuContent()
             }
@@ -224,7 +224,7 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
             queue: .main
         ) { [weak self] _ in
             DispatchQueue.main.async { [weak self] in
-                self?.model.checkExpiration()
+                self?.model.handleSystemTimeChange()
                 self?.updateIcon()
                 self?.updateMenuContent()
             }

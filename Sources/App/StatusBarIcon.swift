@@ -41,18 +41,13 @@ public enum StatusBarIcon {
         return image
     }
 
+    @MainActor
     public static func image(isActive: Bool, isDark: Bool? = nil) -> NSImage {
+        // Resolve the appearance here on the main actor; the drawing handler is
+        // not actor-isolated and must not touch NSApp.
+        let dark = isDark ?? (NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
         let image = NSImage(size: iconSize, flipped: false) { rect in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
-
-            let dark: Bool
-            if let isDark = isDark {
-                dark = isDark
-            } else {
-                let match = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
-                dark = (match == .darkAqua)
-            }
-
             drawIcon(in: rect, ctx: ctx, isActive: isActive, isDark: dark)
             return true
         }

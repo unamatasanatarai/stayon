@@ -22,21 +22,12 @@ fi
 IFS= read -r sdk_path <"$sdk_file"
 rm -f "$sdk_file"
 
-# Increment and track build number
-build_num_file="${project_dir}/BUILD_NUMBER"
-if [[ -f "$build_num_file" ]]; then
-    current_build="$(cat "$build_num_file")"
-    current_build="${current_build//[[:space:]]/}"
-    if [[ "$current_build" =~ ^[0-9]+$ ]]; then
-        build_number=$((current_build + 1))
-    else
-        build_number=1
-    fi
-else
-    build_number=1
+# BUILD_NUMBER is read-only here; release.sh increments and commits it.
+build_number="${BUILD_NUMBER}"
+if [[ ! "$build_number" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "Error: BUILD_NUMBER must be a positive integer, got '${build_number}'" >&2
+    exit 1
 fi
-printf '%s\n' "$build_number" >"$build_num_file"
-export BUILD_NUMBER="$build_number"
 
 build_dir="build"
 app_name="${APP_NAME}"
@@ -46,6 +37,7 @@ contents_dir="${app_dir}/Contents"
 macos_dir="${contents_dir}/MacOS"
 resources_dir="${contents_dir}/Resources"
 
+rm -rf "$app_dir"
 mkdir -p "$macos_dir" "$resources_dir"
 
 if [[ -d "Resources" ]]; then

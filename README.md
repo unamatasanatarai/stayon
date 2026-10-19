@@ -61,7 +61,7 @@ Custom vector-rendered status bar icons seamlessly adapt to both Light Mode and 
 
 ### Persistent Controls & Options
 Includes native, visible checkbox toggles for your environment:
-* **Start at Login**: Registers StayOn to start when your Mac boots (using `SMAppService` on macOS 13+ and `SMLoginItemSetEnabled` on macOS 12).
+* **Start at Login**: Registers StayOn to start when your Mac boots (using `SMAppService` on macOS 13+ and a per-user LaunchAgent on macOS 12).
 * **Activate on Launch**: Automatically enables indefinite sleep prevention every time the app opens.
 * **Prevent Logout**: Keeps display awake and periodically declares user activity via native IOKit assertions (`IOPMAssertionDeclareUserActivity`), suppressing inactivity logouts and lock screens just like Caffeine without requiring Accessibility permissions.
 

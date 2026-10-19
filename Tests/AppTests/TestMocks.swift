@@ -23,12 +23,10 @@ public final class MockSleepAssertionManager: SleepAssertionManaging {
 }
 
 public final class MockPreferencesManager: PreferencesManaging {
-    public var startAtLogin: Bool = false
     public var activateOnLaunch: Bool = false
     public var preventLogout: Bool = true
 
-    public init(startAtLogin: Bool = false, activateOnLaunch: Bool = false, preventLogout: Bool = true) {
-        self.startAtLogin = startAtLogin
+    public init(activateOnLaunch: Bool = false, preventLogout: Bool = true) {
         self.activateOnLaunch = activateOnLaunch
         self.preventLogout = preventLogout
     }
@@ -38,6 +36,7 @@ public final class MockLoginItemManager: LoginItemManaging {
     public var isRegisteredAtLogin: Bool = false
     public var shouldThrowOnRegister: Bool = false
     public var shouldThrowOnUnregister: Bool = false
+    public var refreshCount: Int = 0
 
     public init(isRegisteredAtLogin: Bool = false) {
         self.isRegisteredAtLogin = isRegisteredAtLogin
@@ -55,6 +54,10 @@ public final class MockLoginItemManager: LoginItemManaging {
             throw NSError(domain: "MockLoginItemError", code: 2, userInfo: nil)
         }
         isRegisteredAtLogin = false
+    }
+
+    public func refreshRegistration() {
+        refreshCount += 1
     }
 }
 

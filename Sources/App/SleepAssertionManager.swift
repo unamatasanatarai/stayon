@@ -1,6 +1,5 @@
 import Foundation
 import IOKit.pwr_mgt
-import os
 
 public protocol SleepAssertionManaging: AnyObject {
     var isAssertionActive: Bool { get }
@@ -21,7 +20,7 @@ public final class ProcessInfoSleepAssertionManager: SleepAssertionManaging {
     private var heartbeatTimer: DispatchSourceTimer?
     private let heartbeatQueue = DispatchQueue(label: "com.stayon.heartbeat", qos: .utility)
     private var currentPreventLogout: Bool = false
-    private var lock = os_unfair_lock_s()
+    private let lock = NSLock()
 
     public init() {}
 
@@ -30,16 +29,16 @@ public final class ProcessInfoSleepAssertionManager: SleepAssertionManaging {
     }
 
     public var isAssertionActive: Bool {
-        os_unfair_lock_lock(&lock)
-        defer { os_unfair_lock_unlock(&lock) }
+        lock.lock()
+        defer { lock.unlock() }
         return activityToken != nil
     }
 
     public func acquireAssertion(preventLogout: Bool = true) {
-        os_unfair_lock_lock(&lock)
+        lock.lock()
         if activityToken != nil {
             if currentPreventLogout == preventLogout {
-                os_unfair_lock_unlock(&lock)
+                lock.unlock()
                 return
             }
             // Configuration changed while active - internal release before re-acquiring
@@ -65,13 +64,13 @@ public final class ProcessInfoSleepAssertionManager: SleepAssertionManaging {
         } else {
             internalStopHeartbeat()
         }
-        os_unfair_lock_unlock(&lock)
+        lock.unlock()
     }
 
     public func releaseAssertion() {
-        os_unfair_lock_lock(&lock)
+        lock.lock()
         internalReleaseAssertion()
-        os_unfair_lock_unlock(&lock)
+        lock.unlock()
     }
 
     // Must be called with lock held
@@ -108,8 +107,8 @@ public final class ProcessInfoSleepAssertionManager: SleepAssertionManaging {
     }
 
     private func performHeartbeat() {
-        os_unfair_lock_lock(&lock)
-        defer { os_unfair_lock_unlock(&lock) }
+        lock.lock()
+        defer { lock.unlock() }
         guard activityToken != nil, currentPreventLogout else { return }
         internalDeclareUserActivity()
     }

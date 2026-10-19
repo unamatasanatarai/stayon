@@ -22,8 +22,8 @@ fi
 IFS= read -r sdk_path <"$sdk_file"
 rm -f "$sdk_file"
 
-test_dir="${XDG_RUNTIME_DIR:-/tmp}"
-test_bin="${test_dir}/RunSwiftTests_${RANDOM}"
+test_dir="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"
+test_bin="$(mktemp "${test_dir%/}/RunSwiftTests.XXXXXX")"
 trap 'rm -f "$test_bin"' EXIT INT TERM
 
 # Collect app sources excluding entry points with @main (e.g. Main.swift)

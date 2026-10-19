@@ -197,9 +197,9 @@ The active icon is identical for indefinite and timed activation. The remaining 
 - Language: Swift.
 - UI: AppKit, using `NSStatusItem` and `NSMenu`.
 - App lifecycle: menu-bar-only application, configured as an accessory app (`LSUIElement = YES`).
-- Minimum OS: macOS 13 Ventura or later.
+- Minimum OS: macOS 12 Monterey or later.
 - Preferences: `UserDefaults`.
-- Login item: `SMAppService`, available on the specified minimum OS.
+- Login item: `SMAppService` on macOS 13 and later; on macOS 12, a per-user LaunchAgent in `~/Library/LaunchAgents` (`SMLoginItemSetEnabled` requires an embedded helper bundle).
 - Sleep prevention: `ProcessInfo.processInfo.beginActivity(options:reason:)` combined with native IOKit user activity declarations (`IOPMAssertionDeclareUserActivity`), with correct lifecycle management.
 
 ### Preventing sleep
@@ -241,9 +241,10 @@ Use an AppKit status item with appropriate event handling to toggle activation o
 
 Persist these preferences:
 
-- `startAtLogin`: Boolean.
 - `activateOnLaunch`: Boolean.
 - `preventLogout`: Boolean (defaults to true).
+
+Start at Login is not stored as a preference: the system's login-item registration is the only source of truth, and the menu reads it directly.
 
 Do not persist active runtime state as a promise that sleep prevention remains enabled across launches.
 

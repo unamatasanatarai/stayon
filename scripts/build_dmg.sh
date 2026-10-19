@@ -18,9 +18,14 @@ dmg_name="${APP_NAME}-${VERSION}.dmg"
 dmg_path="${build_dir}/${dmg_name}"
 tmp_dmg="${build_dir}/tmp_rw.dmg"
 
-if [[ ! -d "$app_bundle" ]]; then
-    printf '%s\n' "Application bundle not found. Building ${APP_NAME}..."
-    "${script_dir}/build.sh"
+# Always rebuild: a leftover bundle may carry an older VERSION or stale code.
+printf '%s\n' "Building ${APP_NAME} v${VERSION}..."
+"${script_dir}/build.sh"
+
+built_version="$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "${app_bundle}/Contents/Info.plist")"
+if [[ "$built_version" != "$VERSION" ]]; then
+    printf '%s\n' "Error: built bundle reports v${built_version}, expected v${VERSION}" >&2
+    exit 1
 fi
 
 # Detach any existing mounted volumes with this name

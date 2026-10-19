@@ -86,6 +86,9 @@ target_version="${target_version#v}"
 [[ "$target_version" =~ ^[0-9]+(\.[0-9]+)*$ ]] ||
     die "Invalid version '$target_version'. Expected e.g. 1.0.1"
 
+[[ "${BUILD_NUMBER:-}" =~ ^[0-9]+$ ]] ||
+    die "BUILD_NUMBER must be a positive integer, got '${BUILD_NUMBER:-}'"
+
 for dependency in git curl jq; do
     command -v "$dependency" >/dev/null 2>&1 ||
         die "Required dependency '$dependency' was not found."
@@ -110,9 +113,9 @@ git show-ref --verify --quiet "refs/tags/v${version}" &&
 git diff --cached --quiet ||
     die "You have staged changes. Commit or unstage them before releasing."
 
-# Refuse to overwrite an existing, uncommitted VERSION change.
-git diff --quiet -- VERSION ||
-    die "VERSION has uncommitted changes. Commit or revert them first."
+# Refuse to overwrite existing, uncommitted VERSION or BUILD_NUMBER changes.
+git diff --quiet -- VERSION BUILD_NUMBER ||
+    die "VERSION or BUILD_NUMBER has uncommitted changes. Commit or revert them first."
 
 # Identify the latest reachable version tag.
 previous_tag=""
@@ -287,13 +290,17 @@ IFS= read -r confirmation || confirmation=""
 info "Running unit tests..."
 "${script_dir}/test.sh"
 
-info "Updating VERSION..."
-printf '%s\n' "$version" >VERSION
-export VERSION="$version"
+build_number=$((${BUILD_NUMBER:-0} + 1))
 
-# Commit only the VERSION file; staged changes were checked earlier.
-if ! git diff --quiet -- VERSION; then
-    git add -- VERSION
+info "Updating VERSION to ${version} and BUILD_NUMBER to ${build_number}..."
+printf '%s\n' "$version" >VERSION
+printf '%s\n' "$build_number" >BUILD_NUMBER
+export VERSION="$version"
+export BUILD_NUMBER="$build_number"
+
+# Commit only the version files; staged changes were checked earlier.
+if ! git diff --quiet -- VERSION BUILD_NUMBER; then
+    git add -- VERSION BUILD_NUMBER
     git commit -m "chore(release): bump version to v${version}"
 fi
 
