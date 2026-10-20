@@ -65,6 +65,13 @@ func parseColor(hex: String) -> NSColor {
     return .black
 }
 
+func color(hex: UInt32, alpha: CGFloat = 1.0) -> NSColor {
+    let r = CGFloat((hex >> 16) & 0xFF) / 255.0
+    let g = CGFloat((hex >> 8) & 0xFF) / 255.0
+    let b = CGFloat(hex & 0xFF) / 255.0
+    return NSColor(calibratedRed: r, green: g, blue: b, alpha: alpha)
+}
+
 func generateAppIcons() {
     let scriptUrl = URL(fileURLWithPath: CommandLine.arguments[0])
     let repoRoot = scriptUrl.deletingLastPathComponent().deletingLastPathComponent()
@@ -102,34 +109,121 @@ func generateAppIcons() {
         }
     }
 
-    var strokeWidth: CGFloat = 24
-    if let swRange = svgString.range(of: "stroke-width=\"") {
-        let swStart = swRange.upperBound
-        if let swEnd = svgString[swStart...].range(of: "\"")?.lowerBound {
-            strokeWidth = CGFloat(Double(svgString[swStart..<swEnd]) ?? 24)
-        }
-    }
-
-    var strokeColor = NSColor.black
-    if let sRange = svgString.range(of: "stroke=\"") {
-        let sStart = sRange.upperBound
-        if let sEnd = svgString[sStart...].range(of: "\"")?.lowerBound {
-            let strokeVal = String(svgString[sStart..<sEnd])
-            strokeColor = parseColor(hex: strokeVal)
-        }
-    }
-
-    // CLI overrides
+    var customStrokeColor: NSColor? = nil
     if CommandLine.arguments.contains("--white") {
-        strokeColor = .white
+        customStrokeColor = .white
     } else if let colorIdx = CommandLine.arguments.firstIndex(of: "--color"), colorIdx + 1 < CommandLine.arguments.count {
-        strokeColor = parseColor(hex: CommandLine.arguments[colorIdx + 1])
+        customStrokeColor = parseColor(hex: CommandLine.arguments[colorIdx + 1])
     }
 
     let pulsePath = parsePath(d: dAttr, tx: tx, ty: ty)
-
-    // Render Master 1024x1024 image
     let masterSize: CGFloat = 1024
+    let colorSpace = CGColorSpaceCreateDeviceRGB()
+
+    // -------------------------------------------------------------
+    // 1. Render Supreme Background (Obsidian Glass + Radiant Glow)
+    // -------------------------------------------------------------
+    let bkgRep = NSBitmapImageRep(
+        bitmapDataPlanes: nil,
+        pixelsWide: Int(masterSize),
+        pixelsHigh: Int(masterSize),
+        bitsPerSample: 8,
+        samplesPerPixel: 4,
+        hasAlpha: true,
+        isPlanar: false,
+        colorSpaceName: .deviceRGB,
+        bytesPerRow: 0,
+        bitsPerPixel: 0
+    )!
+    let bkgCtx = NSGraphicsContext(bitmapImageRep: bkgRep)!.cgContext
+
+    // Draw original base squircle for shadow & continuous curvature
+    if let cgBkg = bkgImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+        bkgCtx.draw(cgBkg, in: CGRect(x: 0, y: 0, width: masterSize, height: masterSize))
+    }
+
+    // Paint deep obsidian glass within squircle mask
+    bkgCtx.saveGState()
+    bkgCtx.setBlendMode(.sourceIn)
+
+    let bgColors = [
+        color(hex: 0x161A26).cgColor,  // Top: sleek deep slate
+        color(hex: 0x0D1018).cgColor,  // Mid: deep obsidian glass
+        color(hex: 0x05060A).cgColor   // Bottom: midnight void
+    ] as CFArray
+    if let bgGrad = CGGradient(colorsSpace: colorSpace, colors: bgColors, locations: [0.0, 0.45, 1.0]) {
+        bkgCtx.drawLinearGradient(bgGrad, start: CGPoint(x: 0, y: masterSize), end: CGPoint(x: 0, y: 0), options: [])
+    }
+
+    bkgCtx.setBlendMode(.sourceAtop)
+
+    // Ambient cyan/blue awake glow radiating from the center pulse
+    let auraColors = [
+        color(hex: 0x00E5FF, alpha: 0.30).cgColor,
+        color(hex: 0x0066FF, alpha: 0.16).cgColor,
+        color(hex: 0x000000, alpha: 0.0).cgColor
+    ] as CFArray
+    if let auraGrad = CGGradient(colorsSpace: colorSpace, colors: auraColors, locations: [0.0, 0.32, 1.0]) {
+        bkgCtx.drawRadialGradient(auraGrad, startCenter: CGPoint(x: 512, y: 512), startRadius: 0, endCenter: CGPoint(x: 512, y: 512), endRadius: 440, options: [])
+    }
+
+    // Subtle concentric vital-sign resonance rings
+    for r in [160.0, 240.0, 320.0, 400.0] {
+        bkgCtx.saveGState()
+        bkgCtx.setLineWidth(1.5)
+        bkgCtx.setStrokeColor(color(hex: 0x00E5FF, alpha: 0.055).cgColor)
+        bkgCtx.strokeEllipse(in: CGRect(x: 512 - r, y: 512 - r, width: r * 2, height: r * 2))
+        bkgCtx.restoreGState()
+    }
+
+    // Top Rim Catch-Light (Apple glass reflection)
+    let rimColors = [
+        color(hex: 0xFFFFFF, alpha: 0.32).cgColor,
+        color(hex: 0xFFFFFF, alpha: 0.06).cgColor,
+        color(hex: 0xFFFFFF, alpha: 0.0).cgColor
+    ] as CFArray
+    if let rimGrad = CGGradient(colorsSpace: colorSpace, colors: rimColors, locations: [0.0, 0.07, 0.20]) {
+        bkgCtx.drawLinearGradient(rimGrad, start: CGPoint(x: 0, y: masterSize), end: CGPoint(x: 0, y: 0), options: [])
+    }
+
+    // Bottom subtle ambient bounce reflection
+    let bounceColors = [
+        color(hex: 0xFFFFFF, alpha: 0.0).cgColor,
+        color(hex: 0xFFFFFF, alpha: 0.04).cgColor,
+        color(hex: 0xFFFFFF, alpha: 0.08).cgColor
+    ] as CFArray
+    if let bounceGrad = CGGradient(colorsSpace: colorSpace, colors: bounceColors, locations: [0.0, 0.93, 1.0]) {
+        bkgCtx.drawLinearGradient(bounceGrad, start: CGPoint(x: 0, y: masterSize), end: CGPoint(x: 0, y: 0), options: [])
+    }
+
+    bkgCtx.restoreGState()
+
+    // Save updated 512x512 pulse-appicon-bkg.png
+    let bkg512 = NSBitmapImageRep(
+        bitmapDataPlanes: nil,
+        pixelsWide: 512,
+        pixelsHigh: 512,
+        bitsPerSample: 8,
+        samplesPerPixel: 4,
+        hasAlpha: true,
+        isPlanar: false,
+        colorSpaceName: .deviceRGB,
+        bytesPerRow: 0,
+        bitsPerPixel: 0
+    )!
+    let ctxBkg512 = NSGraphicsContext(bitmapImageRep: bkg512)!.cgContext
+    ctxBkg512.interpolationQuality = .high
+    if let bkgCG = bkgRep.cgImage {
+        ctxBkg512.draw(bkgCG, in: CGRect(x: 0, y: 0, width: 512, height: 512))
+    }
+    if let bkg512Data = bkg512.representation(using: .png, properties: [:]) {
+        try? bkg512Data.write(to: bkgUrl)
+        print("✅ Updated \(bkgUrl.path) (512x512)")
+    }
+
+    // -------------------------------------------------------------
+    // 2. Render Master Icon (Background + Supreme Pulse Line)
+    // -------------------------------------------------------------
     let rep = NSBitmapImageRep(
         bitmapDataPlanes: nil,
         pixelsWide: Int(masterSize),
@@ -142,41 +236,105 @@ func generateAppIcons() {
         bytesPerRow: 0,
         bitsPerPixel: 0
     )!
-
     let ctx = NSGraphicsContext(bitmapImageRep: rep)!.cgContext
 
-    // Draw background scaled to 1024x1024
-    if let cgBkg = bkgImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-        ctx.draw(cgBkg, in: CGRect(x: 0, y: 0, width: masterSize, height: masterSize))
+    // Draw the supreme background
+    if let bkgCG = bkgRep.cgImage {
+        ctx.draw(bkgCG, in: CGRect(x: 0, y: 0, width: masterSize, height: masterSize))
     }
 
-    // Center pulse icon inside squircle
-    // Squircle on 1024 is centered at (512, 512), width ~924
-    // Pulse viewBox is 480 x 234.
+    // Pulse Path geometry
     let targetWidth: CGFloat = 660
     let scale = targetWidth / 480.0
     let targetHeight = 234.0 * scale
     let originX = (masterSize - targetWidth) / 2
     let originY = (masterSize - targetHeight) / 2
+    let strokeWidth: CGFloat = 26.0
 
     ctx.saveGState()
     ctx.translateBy(x: originX, y: originY + targetHeight)
     ctx.scaleBy(x: scale, y: -scale) // Flip Y to match SVG coordinate system
 
-    ctx.addPath(pulsePath)
-    ctx.setStrokeColor(strokeColor.cgColor)
-    ctx.setLineWidth(strokeWidth)
-    ctx.setLineCap(.round)
-    ctx.setLineJoin(.round)
-    ctx.strokePath()
+    if let custom = customStrokeColor {
+        // Custom single-color override
+        ctx.addPath(pulsePath)
+        ctx.setStrokeColor(custom.cgColor)
+        ctx.setLineWidth(strokeWidth)
+        ctx.setLineCap(.round)
+        ctx.setLineJoin(.round)
+        ctx.strokePath()
+    } else {
+        // Supreme multi-pass electric neon rendering
+        let lineColors = [
+            color(hex: 0x00E5FF).cgColor,  // Vivid Electric Cyan
+            color(hex: 0x0099FF).cgColor,  // Radiant Aqua-Azure
+            color(hex: 0x007AFF).cgColor   // Apple Electric Blue
+        ]
+        let glowColor = color(hex: 0x00D2FF, alpha: 0.75)
+
+        // Pass 1: Soft Contact Drop Shadow (3D float effect)
+        ctx.saveGState()
+        ctx.setShadow(offset: CGSize(width: 0, height: 10), blur: 18, color: color(hex: 0x000000, alpha: 0.70).cgColor)
+        ctx.addPath(pulsePath)
+        ctx.setStrokeColor(color(hex: 0x000000, alpha: 0.50).cgColor)
+        ctx.setLineWidth(strokeWidth)
+        ctx.setLineCap(.round)
+        ctx.setLineJoin(.round)
+        ctx.strokePath()
+        ctx.restoreGState()
+
+        // Pass 2: Wide Ambient Neon Bloom
+        ctx.saveGState()
+        ctx.setShadow(offset: CGSize(width: 0, height: 0), blur: 36, color: glowColor.cgColor)
+        ctx.addPath(pulsePath)
+        ctx.setStrokeColor(glowColor.withAlphaComponent(0.40).cgColor)
+        ctx.setLineWidth(strokeWidth + 8)
+        ctx.setLineCap(.round)
+        ctx.setLineJoin(.round)
+        ctx.strokePath()
+        ctx.restoreGState()
+
+        // Pass 3: Intense Near Bloom + Radiant Core Gradient
+        ctx.saveGState()
+        ctx.setShadow(offset: CGSize(width: 0, height: -2), blur: 12, color: glowColor.cgColor)
+        ctx.addPath(pulsePath)
+        ctx.setLineWidth(strokeWidth)
+        ctx.setLineCap(.round)
+        ctx.setLineJoin(.round)
+        if let grad = CGGradient(colorsSpace: colorSpace, colors: lineColors as CFArray, locations: [0.0, 0.5, 1.0]) {
+            ctx.replacePathWithStrokedPath()
+            ctx.clip()
+            ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: 120), end: CGPoint(x: 480, y: 120), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+        }
+        ctx.restoreGState()
+
+        // Pass 4: Inner Core Filament (soft luminous white tube highlight)
+        ctx.saveGState()
+        ctx.addPath(pulsePath)
+        ctx.setLineWidth(strokeWidth * 0.28)
+        ctx.setLineCap(.round)
+        ctx.setLineJoin(.round)
+        let coreColors = [
+            color(hex: 0xFFFFFF, alpha: 0.60).cgColor,
+            color(hex: 0xFFFFFF, alpha: 0.95).cgColor,
+            color(hex: 0xFFFFFF, alpha: 0.60).cgColor
+        ] as CFArray
+        if let coreGrad = CGGradient(colorsSpace: colorSpace, colors: coreColors, locations: [0.0, 0.5, 1.0]) {
+            ctx.replacePathWithStrokedPath()
+            ctx.clip()
+            ctx.drawLinearGradient(coreGrad, start: CGPoint(x: 0, y: 120), end: CGPoint(x: 480, y: 120), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+        }
+        ctx.restoreGState()
+    }
+
     ctx.restoreGState()
 
     guard rep.representation(using: .png, properties: [:]) != nil else {
         fatalError("Error: Failed to encode master PNG")
     }
 
-    let appIconPngUrl = resourcesDir.appendingPathComponent("AppIcon.png")
     // Save 512x512 AppIcon.png
+    let appIconPngUrl = resourcesDir.appendingPathComponent("AppIcon.png")
     let appIcon512 = NSBitmapImageRep(
         bitmapDataPlanes: nil,
         pixelsWide: 512,
